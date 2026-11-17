@@ -34,12 +34,13 @@ jobs:
           grep -q 'f4dd5c0457798af7e2e9cf5a6edce3447947d067' manifests/oos16/oneplus_ace5_pro_6.6.89_w.xml
           grep -q '07ce6f1167c66f7225795ee718fe1d0b5d56db44' manifests/oos16/oneplus_ace5_pro_6.6.89_w.xml
 
-      - name: Install ccache
+      - name: Install ccache and kernel build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache dos2unix libxml2 libxml2-dev
+          sudo apt-get install -y ccache dos2unix libxml2 libxml2-dev libelf-dev
           mkdir -p "$CCACHE_DIR"
           ldconfig -p | grep -q 'libxml2.so.2'
+          test -f /usr/include/libelf.h
           ccache --version
 
       - name: Build pinned PKR110 kernel
