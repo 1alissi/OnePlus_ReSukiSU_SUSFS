@@ -1,0 +1,142 @@
+name: Build PKR110 6.6.89 SELinux Hide Fix
+
+on:
+  push:
+    branches:
+      - selinux-hide-fix-pkr110-6.6.89
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    name: OnePlus Ace 5 Pro / Android 16 / 6.6.89
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate pinned source and patch script
+        run: |
+          set -euo pipefail
+          python3 -m py_compile patches/apply_bakasu_selinux_hide_fix.py
+          grep -q 'f4dd5c0457798af7e2e9cf5a6edce3447947d067' manifests/oos16/oneplus_ace5_pro_6.6.89_w.xml
+          grep -q '07ce6f1167c66f7225795ee718fe1d0b5d56db44' manifests/oos16/oneplus_ace5_pro_6.6.89_w.xml
+
+      - name: Build pinned PKR110 kernel
+        id: build
+        uses: ./.github/actions/build-kernel
+        with:
+          op_config_json: |
+            {
+              "model": "OP-ACE-5-PRO-6.6.89",
+              "soc": "sun",
+              "branch": "wild/sm8750",
+              "manifest": "oneplus_ace5_pro_6.6.89_w.xml",
+              "android_version": "android15",
+              "kernel_version": "6.6",
+              "os_version": "OOS16",
+              "lto": "thin",
+              "zyc_compiler": "https://github.com/ZyCromerZ/Clang/releases/download/19.0.0git-20240723-release/Clang-19.0.0git-20240723.tar.gz",
+              "c_compiler": "kernel_platform/prebuilts/clang/host/linux-x86/clang-r510928/bin",
+              "rust_compiler": "",
+              "bindgen": "",
+              "rust_build": false,
+              "disk_cleanup": false,
+              "hmbird": true,
+              "susfs": true,
+              "ds": true,
+              "bbg": true,
+              "bbr": true,
+              "ttl": true,
+              "ip_set": true,
+              "unicode": true,
+              "ntsync": true,
+              "uname": "OP-RESUKISU"
+            }
+          ksu_type: ReSukiSU
+          ksu_branch_or_hash: 7b65bde0710b5e7c6f755545cb15a4abd417f3a8
+          susfs_commit_hash_or_branch: gki-android15-6.6
+          build_timestamp: ""
+          optimize_level: O2
+          clean: true
+          debug: false
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          selinux_hide_fix: true
+
+      - name: Verify 6.6.89 output and publish flashable AK3
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KERNEL_VERSION: ${{ steps.build.outputs.kernel_version }}
+          KSU_VERSION: ${{ steps.build.outputs.ksu_version }}
+          SUSFS_VERSION: ${{ steps.build.outputs.susfs_version }}
+          ZIP_NAME: ${{ steps.build.outputs.zip_name }}
+          ACTION_ZIP_SHA256: ${{ steps.build.outputs.zip_sha256 }}
+        run: |
+          set -euo pipefail
+          echo "Kernel reported by build: $KERNEL_VERSION"
+          case "$KERNEL_VERSION" in
+            6.6.89*) ;;
+            *) echo "::error::Refusing release: expected kernel 6.6.89, got '$KERNEL_VERSION'"; exit 1 ;;
+          esac
+
+          mkdir -p release-assets
+          ZIP=""
+          if [ -n "$ZIP_NAME" ]; then
+            ZIP=$(find . -type f -path '*/artifacts/*' -name "$ZIP_NAME" -print -quit)
+          fi
+          if [ -z "$ZIP" ]; then
+            ZIP=$(find . -type f -path '*/artifacts/*.zip' -print -quit)
+          fi
+          test -n "$ZIP"
+          case "$(basename "$ZIP")" in
+            *6.6.89*) ;;
+            *) echo "::error::Refusing release: AK3 filename does not identify 6.6.89"; exit 1 ;;
+          esac
+
+          cp "$ZIP" release-assets/
+          ACTUAL_SHA256=$(sha256sum "release-assets/$(basename "$ZIP")" | awk '{print $1}')
+          if [ -n "$ACTION_ZIP_SHA256" ] && [ "$ACTION_ZIP_SHA256" != "$ACTUAL_SHA256" ]; then
+            echo "::error::ZIP SHA256 mismatch: action=$ACTION_ZIP_SHA256 actual=$ACTUAL_SHA256"
+            exit 1
+          fi
+          printf '%s  %s\n' "$ACTUAL_SHA256" "$(basename "$ZIP")" > release-assets/SHA256SUMS.txt
+
+          META=$(find . -type f -path '*/artifacts/SELINUX_HIDE_FIX.txt' -print -quit)
+          test -n "$META"
+          cp "$META" release-assets/
+
+          cat > release-notes.md <<EOF
+          Device: OnePlus Ace 5 Pro (PKR110)
+          OS: OxygenOS 16 / Android 16
+          Kernel: $KERNEL_VERSION
+          Root implementation: BakaSU (formerly ReSukiSU), commit 7b65bde0710b5e7c6f755545cb15a4abd417f3a8
+          Kernel source: OnePlusOSS android_kernel_common_oneplus_sm8750 commit f4dd5c0457798af7e2e9cf5a6edce3447947d067 (6.6.89)
+          Device modules/device tree: 07ce6f1167c66f7225795ee718fe1d0b5d56db44
+          SELinux Hide: BakaSU policy-pair port of KernelSU fixes #3969 and #3981
+          SUSFS: gki-android15-6.6
+          KSU version: $KSU_VERSION
+          SUSFS version: $SUSFS_VERSION
+
+          SHA-256: $ACTUAL_SHA256
+          EOF
+
+          TAG="pkr110-6.6.89-selinux-hide-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" release-assets/* \
+            --title "PKR110 6.6.89 - SELinux Hide fixes #3969 + #3981" \
+            --notes-file release-notes.md
+
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          echo "Release published: $URL"
+          {
+            echo "## Flashable kernel published"
+            echo "- Release: [$TAG]($URL)"
+            echo "- Kernel: $KERNEL_VERSION"
+            echo "- KSU: $KSU_VERSION"
+            echo "- SUSFS: $SUSFS_VERSION"
+            echo "- ZIP: $(basename "$ZIP")"
+            echo "- SHA-256: $ACTUAL_SHA256"
+          } >> "$GITHUB_STEP_SUMMARY"
