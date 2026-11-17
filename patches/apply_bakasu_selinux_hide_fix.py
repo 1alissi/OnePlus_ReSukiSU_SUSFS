@@ -337,7 +337,8 @@ new_block = r'''    /* Obtain a SID for the context, if one was specified. */
 ''' + legacy + r'''
         if (error2 || error)
             return error2 ?: error;
-#endif
+#endif /* legacy policy parser selection */
+#endif /* modern policy-struct fast-path selection */
     }'''
 s = s[:start] + new_block + s[end:]
 p.write_text(s, encoding="utf-8")
@@ -354,6 +355,24 @@ for rel, required in [
     for token in required:
         if token not in text:
             raise SystemExit(f"verification failed: {rel} missing {token}")
+
+# Validate preprocessor nesting in the patched translation unit before clang.
+def check_preprocessor_nesting(path):
+    stack = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        directive = line.lstrip()
+        if directive.startswith(("#if ", "#ifdef ", "#ifndef ")):
+            stack.append(number)
+        elif directive.startswith("#endif"):
+            if not stack:
+                raise SystemExit(f"preprocessor verification failed: unmatched #endif at {path}:{number}")
+            stack.pop()
+        elif directive.startswith(("#else", "#elif")) and not stack:
+            raise SystemExit(f"preprocessor verification failed: orphan {directive.split()[0]} at {path}:{number}")
+    if stack:
+        raise SystemExit(f"preprocessor verification failed: unclosed #if from {path}:{stack[-1]}")
+
+check_preprocessor_nesting(root / "kernel/feature/selinux_hide.c")
 
 result = subprocess.run(["git", "diff", "--check"], cwd=root, capture_output=True, text=True)
 if result.returncode:
