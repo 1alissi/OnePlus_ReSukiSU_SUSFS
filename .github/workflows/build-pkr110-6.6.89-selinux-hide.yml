@@ -11,7 +11,14 @@ permissions:
   actions: write
 
 jobs:
+  mirror-toolchains:
+    uses: ./.github/workflows/mirror-toolchains.yml
+    secrets: inherit
+    permissions:
+      contents: write
+
   build:
+    needs: mirror-toolchains
     name: OnePlus Ace 5 Pro / Android 16 / 6.6.89
     runs-on: ubuntu-latest
     timeout-minutes: 180
