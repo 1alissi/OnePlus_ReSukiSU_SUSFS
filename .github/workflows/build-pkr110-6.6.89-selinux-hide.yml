@@ -37,7 +37,7 @@ jobs:
       - name: Install ccache
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache
+          sudo apt-get install -y ccache dos2unix
           mkdir -p "$CCACHE_DIR"
           ccache --version
 
