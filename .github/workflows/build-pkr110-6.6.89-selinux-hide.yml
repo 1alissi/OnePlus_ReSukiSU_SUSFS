@@ -20,7 +20,7 @@ jobs:
   build:
     needs: mirror-toolchains
     name: OnePlus Ace 5 Pro / Android 16 / 6.6.89
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -37,8 +37,9 @@ jobs:
       - name: Install ccache
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache dos2unix
+          sudo apt-get install -y ccache dos2unix libxml2 libxml2-dev
           mkdir -p "$CCACHE_DIR"
+          ldconfig -p | grep -q 'libxml2.so.2'
           ccache --version
 
       - name: Build pinned PKR110 kernel
