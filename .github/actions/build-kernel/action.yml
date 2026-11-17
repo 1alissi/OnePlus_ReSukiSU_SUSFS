@@ -45,6 +45,10 @@ inputs:
   github_token:
     description: 'GitHub Token'
     required: true
+  selinux_hide_fix:
+    description: 'Apply SELinux Hide timing fixes #3969 and #3981 (BakaSU policy-pair port)'
+    required: false
+    default: 'false'
 
 outputs:
   kernel_version:
@@ -970,6 +974,15 @@ runs:
         
         echo "ReSukiSU Version: $KSU_VERSION"
         echo "✅ ReSukiSU added (commit: ${KSU_COMMIT_SHA:0:8})"
+        echo "::endgroup::"
+
+    - name: Apply SELinux Hide timing fixes (#3969 + #3981)
+      shell: bash
+      if: ${{ inputs.ksu_type == 'ReSukiSU' && inputs.selinux_hide_fix == 'true' }}
+      run: |
+        set -euo pipefail
+        echo "::group::Apply SELinux Hide #3969 + #3981"
+        python3 "$GITHUB_WORKSPACE/patches/apply_bakasu_selinux_hide_fix.py" "$KSU_FOLDER"
         echo "::endgroup::"
 
     - name: Apply SUSFS Patches
