@@ -45,9 +45,9 @@ if bridge_name in hooks:
 # stock selinux_setprocattr(), causing a second parse against the modified
 # live policy. Route the enabled app-UID path to BakaSU's #3969/#3981 handler.
 pattern = re.compile(
-    r'#ifdef CONFIG_KSU_SUSFS\\n'
-    r'static int my_setprocattr\\(const char \\*name, void \\*value, size_t size\\)\\n'
-    r'\\{.*?\\n\\}\\n'
+    r'#ifdef CONFIG_KSU_SUSFS\n'
+    r'static int my_setprocattr\(const char \*name, void \*value, size_t size\)\n'
+    r'\{.*?\n\}\n'
     r'#endif // #ifdef CONFIG_KSU_SUSFS',
     re.S,
 )
