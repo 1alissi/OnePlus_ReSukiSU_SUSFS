@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Connect SUSFS setprocattr to BakaSU's patched SELinux Hide handler."""
 from pathlib import Path
-import re
 import sys
 
 if len(sys.argv) != 3:
@@ -46,32 +45,22 @@ if bridge_name in hooks:
 # SUSFS v2.4.0's in-file callback checks the backup policy and then calls
 # stock selinux_setprocattr(), causing a second parse against the modified
 # live policy. Route the enabled app-UID path to BakaSU's #3969/#3981 handler.
-pattern = re.compile(
-    r'#ifdef CONFIG_KSU_SUSFS' + '\n'
-    r'static int my_setprocattr\(const char \*name, void \*value, size_t size\)' + '\n'
-    r'\{.*?' + '\n' + r'\}' + '\n'
-    r'#endif // #ifdef CONFIG_KSU_SUSFS',
-    re.S,
-)
-matches = list(pattern.finditer(hooks))
-if len(matches) != 1:
-    raise SystemExit(f"expected exactly one SUSFS my_setprocattr body, found {len(matches)}")
+start_anchor = """#ifdef CONFIG_KSU_SUSFS
+static int my_setprocattr(const char *name, void *value, size_t size)
+"""
+if hooks.count(start_anchor) != 1:
+    raise SystemExit(f"expected exactly one SUSFS callback anchor, found {hooks.count(start_anchor)}")
+start = hooks.index(start_anchor)
+end_marker = "\n#endif // #ifdef CONFIG_KSU_SUSFS"
+end = hooks.find(end_marker, start + len(start_anchor))
+if end < 0:
+    raise SystemExit("SUSFS my_setprocattr closing marker not found")
+close_brace = hooks.rfind("\n}", start, end)
+if close_brace < 0 or hooks[close_brace + 2:end]:
+    raise SystemExit("SUSFS my_setprocattr closing brace layout changed")
+replacement_start = start
+replacement_end = end + len(end_marker)
 
-replacement = '''#ifdef CONFIG_KSU_SUSFS
-extern int my_setprocattr(const char *name, void *value, size_t size);
-
-static int susfs_setprocattr_bridge(const char *name, void *value, size_t size)
-{
-    /* Preserve SUSFS's original UID/feature/name gate. */
-    if (likely(current_uid().val < 10000 ||
-               !ksu_selinux_hide_running ||
-               strcmp(name, "current")))
-        return selinux_setprocattr(name, value, size);
-
-    /* Use BakaSU's one-pass parser plus original-type generation checks. */
-    return my_setprocattr(name, value, size);
-}
-#endif // #ifdef CONFIG_KSU_SUSFS'''
 
 hooks = hooks[:matches[0].start()] + replacement + hooks[matches[0].end():]
 hook_old = 'LSM_HOOK_INIT(setprocattr, my_setprocattr)'
