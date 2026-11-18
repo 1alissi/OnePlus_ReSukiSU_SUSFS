@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - selinux-hide-fix-pkr110-6.6.89
+      - fix-pkr110-susfs-selinux-hide-hook
     paths-ignore:
       - '.github/workflows/**'
   workflow_dispatch:
@@ -32,7 +33,8 @@ jobs:
       - name: Validate pinned source and patch script
         run: |
           set -euo pipefail
-          python3 -m py_compile patches/apply_bakasu_selinux_hide_fix.py
+          python3 -m py_compile patches/apply_bakasu_selinux_hide_fix.py patches/apply_susfs_selinux_hide_bridge.py
+          python3 tests/test_susfs_selinux_hide_bridge.py
           grep -q 'f4dd5c0457798af7e2e9cf5a6edce3447947d067' manifests/oos16/oneplus_ace5_pro_6.6.89_w.xml
           grep -q '07ce6f1167c66f7225795ee718fe1d0b5d56db44' manifests/oos16/oneplus_ace5_pro_6.6.89_w.xml
 
@@ -87,7 +89,7 @@ jobs:
           selinux_hide_fix: true
 
       - name: Verify 6.6.89 output and publish flashable AK3
-        if: success()
+        if: success() && github.ref == 'refs/heads/selinux-hide-fix-pkr110-6.6.89'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KERNEL_VERSION: ${{ steps.build.outputs.kernel_version }}
@@ -160,3 +162,12 @@ jobs:
             echo "- ZIP: $(basename "$ZIP")"
             echo "- SHA-256: $ACTUAL_SHA256"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload unmerged bridge-test kernel artifact
+        if: success() && github.ref == 'refs/heads/fix-pkr110-susfs-selinux-hide-hook'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkr110-6.6.89-selinux-hide-bridge-test-${{ github.run_number }}
+          path: |
+            **/artifacts/*.zip
+            **/artifacts/SELINUX_HIDE_FIX.txt
+          if-no-files-found: error
