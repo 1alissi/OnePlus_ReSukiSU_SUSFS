@@ -45,24 +45,29 @@ if bridge_name in hooks:
 # SUSFS v2.4.0's in-file callback checks the backup policy and then calls
 # stock selinux_setprocattr(), causing a second parse against the modified
 # live policy. Route the enabled app-UID path to BakaSU's #3969/#3981 handler.
-start_anchor = """#ifdef CONFIG_KSU_SUSFS
-static int my_setprocattr(const char *name, void *value, size_t size)
-"""
-if hooks.count(start_anchor) != 1:
-    raise SystemExit(f"expected exactly one SUSFS callback anchor, found {hooks.count(start_anchor)}")
-start = hooks.index(start_anchor)
-end_marker = "\n#endif // #ifdef CONFIG_KSU_SUSFS"
-end = hooks.find(end_marker, start + len(start_anchor))
-if end < 0:
-    raise SystemExit("SUSFS my_setprocattr closing marker not found")
-close_brace = hooks.rfind("\n}", start, end)
-if close_brace < 0 or hooks[close_brace + 2:end]:
-    raise SystemExit("SUSFS my_setprocattr closing brace layout changed")
+function_anchor = "static int my_setprocattr(const char *name, void *value, size_t size)"
+if hooks.count(function_anchor) != 1:
+    raise SystemExit(f"expected exactly one SUSFS callback function, found {hooks.count(function_anchor)}")
+start = hooks.index(function_anchor)
+open_brace = hooks.find("{", start + len(function_anchor))
+if open_brace < 0:
+    raise SystemExit("SUSFS my_setprocattr opening brace not found")
+depth = 0
+function_end = -1
+for pos in range(open_brace, len(hooks)):
+    if hooks[pos] == "{":
+        depth += 1
+    elif hooks[pos] == "}":
+        depth -= 1
+        if depth == 0:
+            function_end = pos + 1
+            break
+if function_end < 0:
+    raise SystemExit("SUSFS my_setprocattr closing brace not found")
 replacement_start = start
-replacement_end = end + len(end_marker)
+replacement_end = function_end
 
-replacement = '''#ifdef CONFIG_KSU_SUSFS
-extern int my_setprocattr(const char *name, void *value, size_t size);
+replacement = '''extern int my_setprocattr(const char *name, void *value, size_t size);
 
 static int susfs_setprocattr_bridge(const char *name, void *value, size_t size)
 {
@@ -74,8 +79,7 @@ static int susfs_setprocattr_bridge(const char *name, void *value, size_t size)
 
     /* Use BakaSU's one-pass parser plus original-type generation checks. */
     return my_setprocattr(name, value, size);
-}
-#endif // #ifdef CONFIG_KSU_SUSFS'''
+}'''
 
 hooks = hooks[:replacement_start] + replacement + hooks[replacement_end:]
 
