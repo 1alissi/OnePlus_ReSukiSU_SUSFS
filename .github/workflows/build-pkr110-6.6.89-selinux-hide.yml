@@ -88,6 +88,27 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           selinux_hide_fix: true
 
+      - name: Build temporary SELinux seqno Kprobe module
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$COMMON_KERNEL_FOLDER/out/Module.symvers"
+          grep -q 'void security_compute_av(u32 ssid' "$COMMON_KERNEL_FOLDER/security/selinux/ss/services.c"
+          grep -q 'u32 seqno;' "$COMMON_KERNEL_FOLDER/security/selinux/include/security.h"
+          make -C "$COMMON_KERNEL_FOLDER" O="$COMMON_KERNEL_FOLDER/out" M="$GITHUB_WORKSPACE/patches/kprobe_seqno" ARCH=arm64 LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- modules
+          mkdir -p "$ARTIFACTS_FOLDER/selinux-seqno-kprobe"
+          cp "$GITHUB_WORKSPACE/patches/kprobe_seqno/selinux_avd_seqno_kprobe.ko" "$ARTIFACTS_FOLDER/selinux-seqno-kprobe/"
+          file "$ARTIFACTS_FOLDER/selinux-seqno-kprobe/selinux_avd_seqno_kprobe.ko"
+          sha256sum "$ARTIFACTS_FOLDER/selinux-seqno-kprobe/selinux_avd_seqno_kprobe.ko"
+
+      - name: Upload temporary SELinux seqno Kprobe module
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PKR110-6.6.89-SELinux-Seqno-Kprobe
+          path: ${{ env.ARTIFACTS_FOLDER }}/selinux-seqno-kprobe/selinux_avd_seqno_kprobe.ko
+          if-no-files-found: error
       - name: Verify 6.6.89 output and publish flashable AK3
         if: success() && github.ref == 'refs/heads/selinux-hide-fix-pkr110-6.6.89'
         env:
