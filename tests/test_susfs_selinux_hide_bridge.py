@@ -45,9 +45,12 @@ ksu_fixture = r"""
 #endif
 int __nocfi ksu_handle_selinux_setprocattr(const char *name, void *value, size_t size)
 {
-    return 0;
+    int error = 0;
+    if (size && value)
+        error = security_context_to_sid_live(value, size, &sid);
+    return error;
 }
-bool security_context_to_sid_live_marker(void);
+static int security_context_to_sid_live(const char *value, size_t size, unsigned int *sid);
 """
 
 with tempfile.TemporaryDirectory(prefix="selinux-hide-bridge-test-") as temp:
