@@ -61,8 +61,24 @@ if close_brace < 0 or hooks[close_brace + 2:end]:
 replacement_start = start
 replacement_end = end + len(end_marker)
 
+replacement = '''#ifdef CONFIG_KSU_SUSFS
+extern int my_setprocattr(const char *name, void *value, size_t size);
 
-hooks = hooks[:matches[0].start()] + replacement + hooks[matches[0].end():]
+static int susfs_setprocattr_bridge(const char *name, void *value, size_t size)
+{
+    /* Preserve SUSFS's original UID/feature/name gate. */
+    if (likely(current_uid().val < 10000 ||
+               !ksu_selinux_hide_running ||
+               strcmp(name, "current")))
+        return selinux_setprocattr(name, value, size);
+
+    /* Use BakaSU's one-pass parser plus original-type generation checks. */
+    return my_setprocattr(name, value, size);
+}
+#endif // #ifdef CONFIG_KSU_SUSFS'''
+
+hooks = hooks[:replacement_start] + replacement + hooks[replacement_end:]
+
 hook_old = 'LSM_HOOK_INIT(setprocattr, my_setprocattr)'
 hook_new = 'LSM_HOOK_INIT(setprocattr, susfs_setprocattr_bridge)'
 if hooks.count(hook_old) != 1:
