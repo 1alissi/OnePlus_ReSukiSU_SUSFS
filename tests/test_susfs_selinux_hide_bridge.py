@@ -66,8 +66,10 @@ with tempfile.TemporaryDirectory(prefix="selinux-hide-bridge-test-") as temp:
 
     first = subprocess.run(
         [sys.executable, str(patcher), str(common), str(ksu)],
-        check=True, capture_output=True, text=True,
+        check=False, capture_output=True, text=True,
     )
+    if first.returncode:
+        raise SystemExit("PATCHER FAILED\\nSTDOUT:\\n" + first.stdout + "\\nSTDERR:\\n" + first.stderr)
     updated = hooks.read_text(encoding="utf-8")
     assert "static int susfs_setprocattr_bridge(" in updated
     assert "return my_setprocattr(name, value, size);" in updated
