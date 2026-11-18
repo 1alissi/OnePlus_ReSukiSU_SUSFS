@@ -1173,7 +1173,7 @@ runs:
       run: |
         set -euo pipefail
         python3 "$GITHUB_WORKSPACE/patches/apply_susfs_selinux_hide_bridge.py" "$COMMON_KERNEL_FOLDER" "$KSU_FOLDER"
-        
+
     - name: Add BBG
       if: ${{ env.OP_BBG == 'true' }}
       shell: bash
