@@ -1167,6 +1167,13 @@ runs:
         
         echo "::endgroup::"
         
+    - name: Connect SUSFS to patched BakaSU SELinux Hide handler
+      if: ${{ inputs.ksu_type == 'ReSukiSU' && inputs.selinux_hide_fix == 'true' && env.OP_SUSFS == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 "$GITHUB_WORKSPACE/patches/apply_susfs_selinux_hide_bridge.py" "$COMMON_KERNEL_FOLDER" "$KSU_FOLDER"
+        
     - name: Add BBG
       if: ${{ env.OP_BBG == 'true' }}
       shell: bash
