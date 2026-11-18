@@ -178,9 +178,9 @@ jobs:
           Device runtime testing of the SELinux detector has not yet been performed. Keep the existing boot_a/boot_b backups and verify the current ROM and device before flashing.
           EOF
 
-          gh release create "$TAG" "$ZIP_PATH" "$ZIP_PATH.sha256" release-assets/SELINUX_HIDE_FIX.txt \\
-            --repo "$GITHUB_REPOSITORY" \\
-            --title "PKR110 6.6.89 - SELinux Hide fixes #3969 + #3981" \\
+          gh release create "$TAG" "$ZIP_PATH" "$ZIP_PATH.sha256" release-assets/SELINUX_HIDE_FIX.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "PKR110 6.6.89 - SELinux Hide fixes #3969 + #3981" \
             --notes-file release-notes.md
           echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
           echo "SHA-256: $ZIP_SHA256" >> "$GITHUB_STEP_SUMMARY"
