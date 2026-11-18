@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - selinux-hide-fix-pkr110-6.6.89
+    paths-ignore:
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
@@ -97,7 +99,7 @@ jobs:
           set -euo pipefail
           echo "Kernel reported by build: $KERNEL_VERSION"
           case "$KERNEL_VERSION" in
-            6.6.89*) ;;
+            *6.6.89*) ;;
             *) echo "::error::Refusing release: expected kernel 6.6.89, got '$KERNEL_VERSION'"; exit 1 ;;
           esac
 
