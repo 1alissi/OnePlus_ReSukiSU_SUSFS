@@ -26,6 +26,8 @@ required_ksu = [
     '#define ksu_handle_selinux_setprocattr my_setprocattr',
     'int __nocfi ksu_handle_selinux_setprocattr(',
     'KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE',
+    'security_context_to_sid_live',
+    'error = security_context_to_sid_live(value, size, &sid);',
 ]
 for token in required_ksu:
     if token not in ksu:
